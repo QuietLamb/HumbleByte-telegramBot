@@ -5,7 +5,7 @@ from telegram import Update
 import time
 
 # Load bot token from environment variable
-BOT_TOKEN = os.getenv("HumbleByte_Telegram_Bot_Token")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 def get_quote():
     response = requests.get("https://zenquotes.io/api/random")
