@@ -1,11 +1,7 @@
-import os
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import requests
 from telegram import Update
 import time
-
-# Load bot token from environment variable
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 def get_quote():
     response = requests.get("https://zenquotes.io/api/random")
@@ -35,7 +31,7 @@ async def verse_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(verse)
 
 if __name__ == "__main__":
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app = ApplicationBuilder().token("8190306917:AAF7lRTQqbor1bg6aUlOWO2mmw2U16WpDwQ").build()
     app.add_handler(CommandHandler("quote", quote_command))
     app.add_handler(CommandHandler("verse", verse_command))
     print("🤖 Bot with /quote and /verse is running...")
