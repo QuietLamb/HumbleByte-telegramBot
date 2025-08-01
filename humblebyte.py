@@ -1,7 +1,7 @@
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import requests
 from telegram import Update
-import time
+import random
 
 def get_quote():
     response = requests.get("https://zenquotes.io/api/random")
@@ -10,14 +10,21 @@ def get_quote():
 
 def get_bible_verse():
     try:
-        url = f"https://beta.ourmanna.com/api/v1/get/?format=json&timestamp={int(time.time())}"
+        books = ["John", "Matthew", "Romans", "Psalms", "Proverbs"]
+        chapters = list(range(1, 10))
+        verses = list(range(1, 20))
+
+        book = random.choice(books)
+        chapter = random.choice(chapters)
+        verse = random.choice(verses)
+
+        url = f"https://bible-api.com/{book}+{chapter}:{verse}"
         response = requests.get(url)
         response.raise_for_status()
 
         data = response.json()
-        verse = data["verse"]["details"]
-        text = verse["text"]
-        reference = verse["reference"]
+        text = data["text"].strip()
+        reference = data["reference"]
 
         return f"{reference} - {text}"
     except Exception as e:
