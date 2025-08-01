@@ -1,7 +1,13 @@
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackContext
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 import requests
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 import random
+import json
+import os
+
+# Load data for quiz questions from JSON file
+with open(os.path.join(os.path.dirname(__file__), "HumbleByte-Data.json"), "r", encoding="utf-8") as f:
+    quiz_questions = json.load(f)
 
 # get quote from API
 def get_quote():
@@ -34,23 +40,29 @@ def get_bible_verse():
 
 # Handle /quote command
 async def quote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    quote = get_quote()
-    msg = await update.message.reply_text(quote)
-    user_messages.setdefault(user_id, []).append(msg.message_id)
+    try:
+        user_id = update.effective_user.id
+        quote = get_quote()
+        msg = await update.message.reply_text(quote)
+        user_messages.setdefault(user_id, []).append(msg.message_id)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {e}")
 
 # Handle /verse command
 async def verse_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    verse = get_bible_verse()
-    msg = await update.message.reply_text(verse)
-    user_messages.setdefault(user_id, []).append(msg.message_id)
+    try:
+        user_id = update.effective_user.id
+        verse = get_bible_verse()
+        msg = await update.message.reply_text(verse)
+        user_messages.setdefault(user_id, []).append(msg.message_id)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {e}")
 
 # Track message ID of user
 user_messages = {}
 
 # Handle /empty command
-def empty(update: Update, context: CallbackContext):
+async def empty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
 
@@ -58,17 +70,67 @@ def empty(update: Update, context: CallbackContext):
     if user_id in user_messages:
         for msg_id in user_messages[user_id]:
             try:
-                context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-            except:
-                pass
-    user_messages[user_id] = []
+                await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+            except Exception as e:
+                print(f"Failed to delete message {msg_id}: {e}")
+        user_messages[user_id] = []
+
+# Handle /quiz command
+async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    asked = context.user_data.get("asked_questions", set())
+
+    available_indexes = [i for i in range(len(quiz_questions)) if i not in asked]
+
+    if not available_indexes:
+        context.user_data["asked_questions"] = set()
+        available_indexes = list(range(len(quiz_questions)))
+
+    q_index = random.choice(available_indexes)
+    context.user_data["asked_questions"].add(q_index)
+
+    question = quiz_questions[q_index]
+    context.user_data["quiz"] = question
+
+    buttons = [
+        [InlineKeyboardButton(opt, callback_data=opt)] for opt in question["options"]
+    ]
+
+    await update.message.reply_text(
+        f"🧠 *Bible Quiz:*\n{question['question']}",
+        reply_markup=InlineKeyboardMarkup(buttons),
+        parse_mode="Markdown"
+    )
+
+# Handle Answer
+async def handle_quiz_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    selected = query.data
+    question = context.user_data.get("quiz")
+
+    if not question:
+        await query.edit_message_text("No active quiz. Send /quiz to start.")
+        return
+
+    correct = question["answer"]
+
+    if selected == correct:
+        text = f"✅ Correct! *{correct}* is the right answer."
+    else:
+        text = f"❌ Wrong. You chose *{selected}*.\nThe correct answer is *{correct}*."
+
+    await query.edit_message_text(text, parse_mode="Markdown")
+    context.user_data["quiz"] = None
 
 # Add command handlers
 if __name__ == "__main__":
     app = ApplicationBuilder().token("8190306917:AAF7lRTQqbor1bg6aUlOWO2mmw2U16WpDwQ").build()
     app.add_handler(CommandHandler("quote", quote_command))
     app.add_handler(CommandHandler("verse", verse_command))
-    app.add_handler(CommandHandler("empty", empty))  
+    app.add_handler(CommandHandler("empty", empty))
+    app.add_handler(CommandHandler("quiz", quiz_command))
+    app.add_handler(CallbackQueryHandler(handle_quiz_answer))
 
     print("🤖 Bot is running...")
     app.run_polling()
