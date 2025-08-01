@@ -38,6 +38,15 @@ def get_bible_verse():
     except Exception as e:
         return f"❌ Error fetching verse: {e}"
 
+# get random life tips from API
+def get_tip():
+    try:
+        res = requests.get("https://api.adviceslip.com/advice")
+        data = res.json()
+        return f'💡 Life Tip:\n"{data["slip"]["advice"]}"'
+    except Exception as e:
+        return f"❌ Error fetching tip: {e}"
+
 # Handle /quote command
 async def quote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -77,11 +86,15 @@ async def empty(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Handle /quiz command
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    asked = context.user_data.get("asked_questions", set())
+    # Initialize the set if it doesn't exist
+    if "asked_questions" not in context.user_data:
+        context.user_data["asked_questions"] = set()
+    asked = context.user_data["asked_questions"]
 
     available_indexes = [i for i in range(len(quiz_questions)) if i not in asked]
 
     if not available_indexes:
+        # Reset when all questions asked
         context.user_data["asked_questions"] = set()
         available_indexes = list(range(len(quiz_questions)))
 
@@ -123,6 +136,16 @@ async def handle_quiz_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.edit_message_text(text, parse_mode="Markdown")
     context.user_data["quiz"] = None
 
+# Handle /tip command
+async def tip_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        user_id = update.effective_user.id
+        tip = get_tip()
+        msg = await update.message.reply_text(tip)
+        user_messages.setdefault(user_id, []).append(msg.message_id)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {e}")
+
 # Add command handlers
 if __name__ == "__main__":
     app = ApplicationBuilder().token("8190306917:AAF7lRTQqbor1bg6aUlOWO2mmw2U16WpDwQ").build()
@@ -131,6 +154,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("empty", empty))
     app.add_handler(CommandHandler("quiz", quiz_command))
     app.add_handler(CallbackQueryHandler(handle_quiz_answer))
+    app.add_handler(CommandHandler("tip", tip_command))
 
     print("🤖 Bot is running...")
     app.run_polling()
